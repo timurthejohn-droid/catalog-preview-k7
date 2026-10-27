@@ -1,0 +1,19 @@
+<!doctype html><html lang="ru"><head><meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Закрытый просмотр</title><style>*{box-sizing:border-box}html,body{margin:0;height:100%}body{background:#F4F1E8;color:#16130F;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:grid;place-items:center;padding:24px}
+#g{width:min(380px,100%)}#g[hidden]{display:none}h1{font-weight:400;font-size:28px;letter-spacing:-.03em;margin:0 0 6px}p{margin:0 0 22px;color:#5b564c;font-size:14px}
+input{width:100%;height:50px;border:1px solid #16130F;background:#fff;padding:0 14px;font:inherit;border-radius:0;-webkit-appearance:none}
+button{margin-top:10px;width:100%;height:50px;border:0;background:#16130F;color:#F4F1E8;font:500 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border-radius:0}
+button:hover{background:#F8F000;color:#16130F}.e{color:#b3261e;font-size:13px;margin-top:10px;min-height:18px}</style></head><body><div id="g" hidden><h1>Закрытый просмотр</h1><p>Введите пароль, который вам прислали.</p><form><input type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль"><button type="submit">Открыть</button><div class="e" role="alert"></div></form></div><noscript><p style="text-align:center">Для просмотра включите JavaScript.</p></noscript><script id="d" type="application/octet-stream">0CfcqRQKYrOx7YHXlj1W+WfTLHLRmjyRDrhm5wd0NT7CeBRlwSAKICQe6rFnh6yQj1oeBT2PenB5461coTV5t+MKIcT6SUfeIJUz07E4pVubtlLkGJmUyPUebyXC8VNWMeAdsijyHZSG2goKDc9Vinttlmpgh0EonyjSzHIExpJpeCLUi5Ox0gO0G3QAAdha7+E4VVcPKsISaWVoUxxIGK61dWYI0ipx+B0s5A3I4DvYhr3JLzt4tK8MKqhKU/REH0Cnj33V/Oe61KF/5G08DgzPiM88MwNNfaym+JSEQJ76cvya1r7K5wDC3KTCXMgoXA==</script><script>(function(){var SALT="GXzw5Pn86wDOqCdHPajBxw==",IT=200000,K="cpk7";
+function b(s){var x=atob(s),u=new Uint8Array(x.length);for(var i=0;i<x.length;i++)u[i]=x.charCodeAt(i);return u}
+function e(u){var x="";for(var i=0;i<u.length;i++)x+=String.fromCharCode(u[i]);return btoa(x)}
+var d=b(document.getElementById("d").textContent.replace(/\s+/g,"")),iv=d.slice(0,12),ct=d.slice(12);
+function dec(raw){return crypto.subtle.importKey("raw",raw,"AES-GCM",false,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:iv},k,ct)}).then(function(p){return new TextDecoder().decode(p)})}
+function show(h){document.open();document.write(h);document.close()}
+function gate(){var g=document.getElementById("g"),f=g.querySelector("form"),m=g.querySelector(".e"),i=g.querySelector("input");g.hidden=false;i.focus();
+if(!window.crypto||!crypto.subtle){m.textContent="Браузер не умеет расшифровывать. Откройте в Safari, Chrome или Firefox.";return}
+f.addEventListener("submit",function(ev){ev.preventDefault();m.textContent="Проверяем…";
+crypto.subtle.importKey("raw",new TextEncoder().encode(i.value.trim()),"PBKDF2",false,["deriveBits"]).then(function(km){return crypto.subtle.deriveBits({name:"PBKDF2",salt:b(SALT),iterations:IT,hash:"SHA-256"},km,256)})
+.then(function(bits){var raw=new Uint8Array(bits);return dec(raw).then(function(h){try{localStorage.setItem(K,e(raw))}catch(x){}show(h)})})
+.catch(function(){m.textContent="Неверный пароль";i.select()})})}
+var r=null;try{r=localStorage.getItem(K)}catch(x){}
+if(r){dec(b(r)).then(show,function(){try{localStorage.removeItem(K)}catch(x){}gate()})}else gate()})();</script></body></html>
