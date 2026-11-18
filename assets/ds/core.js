@@ -21,9 +21,12 @@
      событие обязано совпадать с заведённой целью, иначе уходит в пустоту. */
   ICE.section = function(){
     var p = location.pathname;
-    if(p.indexOf('/shveinoe-proizvodstvo') === 0) return 'factory';
+    /* Раздел = цель заявки в Метрике (cnv_<раздел>) и её оплачивает стратегия Директа.
+       29 окт: мерч, вышивка и печать были в «прочих» (cnv_site), хотя это производство,
+       стартовые майки — раздел «Спортивная одежда» в меню. До 29 окт их заявки — cnv_site. */
+    if(/^\/(shveinoe-proizvodstvo|proizvodstvo-mercha|mashinnaya-vishivka|tkani-print)/.test(p)) return 'factory';
     if(p.indexOf('/proizvodstvo-vmesto-kitaya') === 0) return 'china';
-    if(p.indexOf('/sportivnaya-odezhda') === 0) return 'sport';
+    if(p.indexOf('/sportivnaya-odezhda') === 0 || p.indexOf('/izgotovlenie-startovykh-maek') === 0) return 'sport';
     if(p.indexOf('/izgotovlenie-kupalnikov') === 0) return 'pool';
     if(p.indexOf('/bifleks') === 0) return 'fabric';
     return 'site';
@@ -277,10 +280,16 @@
   function heroVideo(){
     var modal = $('[data-vmodal]'); if(!modal) return;
     var hv = $('[data-hv]'), stage = $('.vmodal__stage', modal), mv = $('video', modal);
-    /* без видео-героя (внутренние страницы) окно открывается от блока [data-v-frame] или кнопки [data-v-open] */
-    var frame = hv ? $('.hv__frame', hv) : ($('[data-v-frame]') || $('[data-v-open]')), bg = frame ? $('video', frame) : null, label = hv ? $('.hv__cursor', frame) : null;
-    /* ролик в рамке без звука: на первом экране стартует сразу, в блоке ниже — когда блок в кадре (наблюдатель внизу) */
-    if(bg){ bg.muted = true; if(hv){ var p = bg.play(); if(p && p.catch) p.catch(function(){}); } }
+    /* рамок с роликом на странице может быть несколько (14 ноя 2026: на «Швейном производстве» — первый экран
+       и блок «Видео»); без видео-героя окно открывается от блоков [data-v-frame] или кнопки [data-v-open] */
+    var frames = hv ? [$('.hv__frame', hv)] : $$('[data-v-frame]');
+    if(!frames.length && $('[data-v-open]')) frames = [$('[data-v-open]')];
+    if(!frames.length || !frames[0]) return;
+    var frame = frames[0], label = hv ? $('.hv__cursor', frame) : null;
+    function bgOf(fr){ return fr ? $('video', fr) : null; }
+    /* ролик в рамке без звука: на главной стартует сразу, остальные — когда рамка в кадре (наблюдатель внизу) */
+    frames.forEach(function(fr){ var v = bgOf(fr); if(v) v.muted = true; });
+    if(hv){ var bg0 = bgOf(frame); if(bg0){ var p = bg0.play(); if(p && p.catch) p.catch(function(){}); } }
     /* надпись «смотреть со звуком» едет за курсором с инерцией */
     if(label && fine){
       var tx = 0, ty = 0, x = 0, y = 0, raf = 0;
@@ -310,10 +319,12 @@
     range.addEventListener('pointerup', function(){ range.removeEventListener('pointermove', seek); });
     var lastFocus = null;
     var vSent = false;
-    function openV(){
+    var seen = [];   /* рамки, которые сейчас в кадре: после закрытия плеера крутятся снова только они */
+    function openV(fr){
       /* фоновый ролик крутится сам, поэтому считаем только осознанный запуск —
          открытие полноэкранного плеера */
       if(!vSent){ vSent = true; ICE.goal('video_play', {page: location.pathname}); }
+      frame = fr || frames[0];
       lastFocus = document.activeElement;
       if(!mv.getAttribute('src')) mv.src = mv.getAttribute('data-src');
       stage.style.setProperty('--clip', reduce ? 'inset(0 0 0 0)' : rectClip());
@@ -322,17 +333,25 @@
       requestAnimationFrame(function(){ stage.style.setProperty('--clip', 'inset(0 0 0 0)'); });
       mv.currentTime = 0; mv.muted = false; mv.volume = 1; setMute();
       var pr = mv.play(); if(pr && pr.catch) pr.catch(function(){ mv.muted = true; setMute(); mv.play(); });
-      bg && bg.pause();
+      frames.forEach(function(f){ var v = bgOf(f); v && v.pause(); });
       $('.vmodal__close', modal).focus({preventScroll:true});
     }
     function closeV(){
       if(!modal.classList.contains('is-open')) return;
       stage.style.setProperty('--clip', reduce ? 'inset(50%)' : rectClip());
       mv.pause();
-      setTimeout(function(){ modal.classList.remove('is-open'); ICE.lock(false); bg && bg.play().catch(function(){}); lastFocus && lastFocus.focus && lastFocus.focus({preventScroll:true}); }, reduce ? 0 : 650);
+      setTimeout(function(){
+        modal.classList.remove('is-open'); ICE.lock(false);
+        frames.forEach(function(f){ var v = bgOf(f); if(v && (hv || seen.indexOf(f) > -1 || !('IntersectionObserver' in window))) v.play().catch(function(){}); });
+        lastFocus && lastFocus.focus && lastFocus.focus({preventScroll:true});
+      }, reduce ? 0 : 650);
     }
-    if(hv || frame.hasAttribute('data-v-frame')) frame.addEventListener('click', function(e){ if(e.target.closest('a,[data-v-open]')) return; openV(); });
-    $$('[data-v-open]').forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); openV(); }); });
+    frames.forEach(function(fr){
+      if(!(hv || fr.hasAttribute('data-v-frame'))) return;
+      fr.addEventListener('click', function(e){ if(e.target.closest('a,[data-v-open]')) return; openV(fr); });
+      fr.addEventListener('keydown', function(e){ if(e.target === fr && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); openV(fr); } });
+    });
+    $$('[data-v-open]').forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); openV(b.closest('[data-v-frame]') || frames[0]); }); });
     $('.vmodal__close', modal).addEventListener('click', closeV);
     $('.vmodal__veil', modal).addEventListener('click', closeV);
     addEventListener('keydown', function(e){
@@ -340,12 +359,17 @@
       if(e.key === 'Escape') closeV();
       if(e.key === ' ' && document.activeElement && document.activeElement.tagName !== 'BUTTON'){ e.preventDefault(); mv.paused ? mv.play() : mv.pause(); }
     });
-    /* видео не играет за кадром — экономим батарею */
-    if('IntersectionObserver' in window && bg){
-      new IntersectionObserver(function(es){ es.forEach(function(e){
+    /* видео не играет за кадром — экономим батарею и трафик: петля (preload="none") начинает грузиться,
+       только когда рамка попала на экран */
+    if('IntersectionObserver' in window){
+      var io = new IntersectionObserver(function(es){ es.forEach(function(e){
+        var v = bgOf(e.target); if(!v) return;
+        var i = seen.indexOf(e.target);
+        if(e.isIntersecting){ if(i < 0) seen.push(e.target); } else if(i > -1) seen.splice(i, 1);
         if(modal.classList.contains('is-open')) return;
-        if(e.isIntersecting) bg.play().catch(function(){}); else bg.pause();
-      }); }).observe(frame);
+        if(e.isIntersecting) v.play().catch(function(){}); else v.pause();
+      }); });
+      frames.forEach(function(fr){ if(bgOf(fr)) io.observe(fr); });
     }
   }
   var ICON = {
@@ -584,9 +608,14 @@
     return lines.join('\n');
   };
   /* рекламные метки: запоминаем на время визита, уходят с заявкой (send.php знает эти поля) */
+  ICE.AD_KEYS = ['campaign_id', 'adgroup_id', 'ad_id', 'phrase_id', 'network', 'placement', 'device', 'region_id', 'target_id', 'product', 'match_type', 'matched_keyword'];
   ICE.utm = function(){
     var keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'yclid', 'gclid'], got = {}, q = new URLSearchParams(location.search), any = false;
     keys.forEach(function(k){ var v = q.get(k); if(v){ got[k] = v.slice(0, 200); any = true; } });
+    /* Метки из ссылок кампаний Директа (группа, фраза, площадка, устройство…) — по ним
+       в CRM видно, что именно дало заявку. Берём только вместе с рекламной меткой:
+       имена вроде product или device слишком общие, чтобы ловить их с любой ссылки. */
+    if(any) ICE.AD_KEYS.forEach(function(k){ var v = q.get(k); if(v) got[k] = v.slice(0, k === 'matched_keyword' ? 250 : 100); });
     if(q.get('h')){ got.variant = 'h=' + q.get('h').slice(0, 40); any = true; }
     /* Сессии не хватает: по рекламе зашли, ушли подумать, вернулись через день напрямую —
        заявка должна остаться с меткой. Поэтому дублируем в localStorage на 30 дней,
@@ -605,26 +634,234 @@
     }catch(e){ got = got || {}; }
     return got || {};
   };
+  /* ── выбор способа связи в формах (4 ноя 2026, решение пользователя) ─────
+     Поле ввода одно (name=phone — его знают send.php и обработчик ниже), а ряд кнопок
+     над ним переключает подпись, тип, клавиатуру, подсказку и строку «когда ответим».
+     Выбранный канал уходит скрытым полем channel: у него есть data-label, поэтому
+     ICE.packMessage сам кладёт «Канал: Telegram» в message — менеджер видит, куда писать.
+     ⚠️ Разметку даёт tpl.chs()/contact_field(), стили — блок «ВЫБОР СПОСОБА СВЯЗИ» в ds.css. */
+  var CH = {
+    phone: {label:'Телефон',  type:'tel',   im:'tel',   ac:'tel',   ph:'+7 ___ ___-__-__', cb:'Перезвоним в течение рабочего дня.'},
+    tg:    {label:'Telegram', type:'text',  im:'text',  ac:'off',   ph:'@ник или телефон', cb:'Напишем в Telegram в течение рабочего дня.'},
+    wa:    {label:'WhatsApp', type:'tel',   im:'tel',   ac:'tel',   ph:'+7 ___ ___-__-__', cb:'Напишем в WhatsApp в течение рабочего дня.'},
+    mail:  {label:'Почта',    type:'email', im:'email', ac:'email', ph:'name@company.ru',  cb:'Ответим на почту в течение рабочего дня.'}
+  };
+  /* Проверка контакта под выбранный канал. Нужна здесь, а не только на сервере:
+     иначе человек жмёт кнопку, ждёт ответ и получает общую ошибку без подсказки, что чинить. */
+  function chValid(kind, v){
+    v = (v || '').trim();
+    var digits = v.replace(/\D+/g, '') || '';
+    if(kind === 'mail') return /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(v);
+    if(kind === 'tg') return /^@?[A-Za-z0-9_]{4,32}$/.test(v) || digits.length >= 10;
+    return digits.length >= 10;
+  }
+  function chErrText(kind, empty){
+    if(empty) return 'Оставьте контакт — иначе мы не сможем ответить.';
+    if(kind === 'mail') return 'Проверьте почту — похоже, адрес неполный.';
+    if(kind === 'tg') return 'Укажите ник вида @name или номер телефона.';
+    return 'Проверьте номер — похоже, он неполный.';
+  }
+  function chClearErr(f){ var e = $('.cerr', f); if(e) e.remove(); }
+  var picked = {};
+  /* ── черновик контакта: переносим введённое между страницами ──────────────
+     Повод (разбор 4 ноя): на хабе спортодежды 7 человек из 12, начавших вводить
+     контакт, ушли кликать свой вид спорта — плашки стоят рядом с формой. На новой
+     странице поле пустое, и человек начинает заново либо не начинает вовсе.
+     ⚠️ Храним в sessionStorage: живёт только в этой вкладке и умирает вместе с ней.
+     localStorage не берём — это контактные данные, им незачем переживать сессию. */
+  var DRAFT = 'ice-draft';
+  function draftSave(f){
+    try{
+      var inp = $('[data-ch-input]', f), nm = $('[name=name]', f), d = {};
+      if(inp && inp.value.trim()) d.c = inp.value.trim().slice(0, 120);
+      if(nm && nm.value.trim()) d.n = nm.value.trim().slice(0, 120);
+      if(f._ch) d.ch = f._ch;
+      if(d.c || d.n) sessionStorage.setItem(DRAFT, JSON.stringify(d));
+    }catch(e){}
+  }
+  function draftApply(){
+    var d;
+    try{ d = JSON.parse(sessionStorage.getItem(DRAFT) || 'null'); }catch(e){ return; }
+    if(!d) return;
+    $$('form[data-form]').forEach(function(f){
+      /* канал восстанавливаем нажатием на его кнопку — тогда поле, подпись и строка
+         «когда ответим» перестроятся штатным обработчиком, без дублирования логики */
+      if(d.ch && d.ch !== 'phone'){
+        var b = $('.chs__b[data-ch=' + d.ch + ']', f);
+        if(b && b.getAttribute('aria-pressed') !== 'true') b.click();
+      }
+      var inp = $('[data-ch-input]', f), nm = $('[name=name]', f);
+      if(inp && !inp.value && d.c) inp.value = d.c;
+      if(nm && !nm.value && d.n) nm.value = d.n;
+    });
+  }
+  function draftForget(){
+    try{ sessionStorage.setItem(DRAFT, ''); }catch(e){}
+  }
+  function draftWatch(){
+    /* пишем на вводе с задержкой и обязательно при уходе со страницы:
+       клик по плашке вида спорта уводит быстрее, чем отработает задержка */
+    var t = null;
+    document.addEventListener('input', function(e){
+      var el = e.target;
+      if(!el.name || (el.name !== 'name' && !el.hasAttribute('data-ch-input'))) return;
+      var f = el.closest('form[data-form]'); if(!f) return;
+      clearTimeout(t); t = setTimeout(function(){ draftSave(f); }, 400);
+    }, true);
+    var flush = function(){
+      $$('form[data-form]').forEach(function(f){
+        var i = $('[data-ch-input]', f), n = $('[name=name]', f);
+        if((i && i.value.trim()) || (n && n.value.trim())) draftSave(f);
+      });
+    };
+    document.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'hidden') flush();
+    });
+    /* заявка ушла — черновик больше не нужен, иначе всплыл бы в следующей форме */
+    document.addEventListener('ice:sent', draftForget, true);
+    draftApply();
+  }
+  function channels(){
+    document.addEventListener('click', function(e){
+      var b = e.target.closest('.chs__b'); if(!b) return;
+      var box = b.closest('[data-chs]'), f = b.closest('form');
+      if(!box || !f) return;
+      var k = b.getAttribute('data-ch'), c = CH[k]; if(!c) return;
+      $$('.chs__b', box).forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+      f._ch = k;
+      var hid = $('[name=channel]', box); if(hid) hid.value = c.label;
+      var inp = $('[data-ch-input]', f);
+      if(inp){
+        inp.type = c.type; inp.setAttribute('inputmode', c.im); inp.setAttribute('autocomplete', c.ac);
+        inp.placeholder = c.ph; inp.value = '';
+        if(inp.hasAttribute('aria-label')) inp.setAttribute('aria-label', c.label);
+        try{ inp.focus({preventScroll: true}); }catch(err){ try{ inp.focus(); }catch(e2){} }
+      }
+      var lab = $('[data-ch-label]', f); if(lab) lab.textContent = c.label;
+      /* Строка «когда ответим» обязана совпадать с выбранным каналом — иначе мы обещаем
+         звонок тому, кто просил написать. Для телефона возвращаем текст, посчитанный
+         callbackNote() по московскому времени (он учитывает нерабочие часы). */
+      var cb = $('[data-cbnote]', f);
+      if(cb){
+        if(cb._base === undefined) cb._base = cb.textContent;
+        cb.textContent = k === 'phone' ? cb._base : c.cb;
+      }
+      chClearErr(f);
+      /* Один раз на форму: сколько людей вообще трогают переключатель — по этому и будет
+         видно, стоила ли правка усилий. Какой канал выбран в итоге, видно в заявке
+         строкой «Канал: …», поэтому дробить цель по каналам незачем. */
+      var fid = f.getAttribute('data-form') || 'lead';
+      if(!picked[fid]){ picked[fid] = 1; ICE.goal('contact_pick', {form: fid, channel: k}); }
+    }, false);
+    /* ошибка снимается, как только человек начал править контакт или имя */
+    document.addEventListener('input', function(e){
+      var t = e.target; if(!t || !t.hasAttribute) return;
+      if(t.hasAttribute('data-ch-input')){
+        var f = t.closest('form'); if(f) chClearErr(f);
+      }
+      if(t.name === 'name'){
+        var f2 = t.closest('form'); if(f2){ var ne = $('.nerr', f2); if(ne) ne.remove(); }
+      }
+    }, true);
+  }
+
   function forms(){
     try{ ICE.utm(); }catch(e){}
-    /* «Начал заполнять» — показывает, доходит ли трафик до формы вообще:
-       без этой отметки падение конверсии не отличить от «форму не увидели». */
+    /* «Начал заполнять» — человек начал вводить имя, телефон или комментарий.
+       Картинки квиза, галочки и списки сюда не идут: квиз — тоже форма, и до 27 окт
+       цель срабатывала от первой же картинки (16 «начал заполнять» на 17 начатых квизов).
+       ⚠️ Эту цель оплачивает стратегия Директа — менять условие только вместе с командой. */
+    var typed = function(t){ return t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' && /^(text|tel|email)$/.test(t.type)) && t.name !== 'website'; };
     var started = {};
     document.addEventListener('input', function(e){
-      var f = e.target.closest && e.target.closest('form[data-form]'); if(!f) return;
+      if(!typed(e.target)) return;
+      var f = e.target.closest('form[data-form]'); if(!f) return;
       var id = f.getAttribute('data-form') || 'lead';
       if(started[id]) return; started[id] = 1;
       ICE.goal('form_start', {form: id});
     }, true);
+    mobileForms(typed);
+    var missed = {};
+    document.addEventListener('change', function(e){
+      if(e.target.name !== 'consent' || !e.target.checked) return;
+      var chk = e.target.closest('.check'); if(!chk) return;
+      chk.classList.remove('is-err'); var m = chk.nextElementSibling; if(m && m.classList.contains('check__err')) m.remove();
+    });
     document.addEventListener('submit', function(e){
       var f = e.target.closest('form[data-form]'); if(!f) return;
       e.preventDefault();
+      if(f._busy) return;
       var hp = $('input[name=website]', f); if(hp && hp.value) return;
-      var c = $('input[name=consent]', f);
-      if(c && !c.checked){ c.focus(); c.closest('.check').animate([{transform:'translateX(0)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], {duration:260, iterations:2}); return; }
+      /* Согласие. С 29 окт 2026 это скрытое поле со значением «1», а текст стоит под кнопкой
+         (нажатие = согласие). ⚠️ Читать только через .checked нельзя: у hidden его нет, и форма
+         молча считала бы согласие неданным. Галочка ещё может встретиться в старой вёрстке —
+         поэтому ветка с ошибкой осталась, но срабатывает только для checkbox. */
+      var c = $('[name=consent]', f);
+      var agreed = !c || (c.type === 'checkbox' ? c.checked : !!c.value);
+      if(c && c.type === 'checkbox' && !agreed){
+        var chk = c.closest('.check'), id = f.getAttribute('data-form') || 'lead';
+        chk.classList.add('is-err');
+        if(!(chk.nextElementSibling && chk.nextElementSibling.classList.contains('check__err'))){
+          var m = document.createElement('p'); m.className = 'check__err'; m.setAttribute('role', 'alert');
+          m.textContent = 'Отметьте галочку согласия — без неё заявку отправить нельзя.';
+          chk.insertAdjacentElement('afterend', m);
+        }
+        if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        chk.scrollIntoView({block:'center', behavior:'smooth'});
+        chk.animate([{transform:'translateX(0)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], {duration:260, iterations:2});
+        if(!missed[id]){ missed[id] = 1; ICE.goal('consent_miss', {form: id}); }
+        return;
+      }
+      /* Имя обязательно (решение пользователя 12 ноя 2026; до этого поле было необязательным
+         с 4 ноя, а 29 окт его не было вовсе). Проверяем только если поле в форме есть.
+         ⚠️ Сервер намеренно остаётся мягким и подставляет «Без имени»: иначе заявка со страницы,
+         поднятой из кэша браузера (старая вёрстка без поля), молча терялась бы. */
+      var ni = $('[name=name]', f);
+      if(ni){
+        var nv = (ni.value || '').trim();
+        if(nv.replace(/[^a-zA-Zа-яёА-ЯЁ]/g, '').length < 2){
+          var ne = $('.nerr', f);
+          if(!ne){
+            ne = document.createElement('p'); ne.className = 'cerr nerr'; ne.setAttribute('role', 'alert');
+            (ni.closest('.field') || ni).insertAdjacentElement('afterend', ne);
+          }
+          ne.textContent = nv ? 'Напишите имя целиком — менеджер обратится к вам по имени.'
+                              : 'Напишите, как к вам обращаться.';
+          try{ ni.focus({preventScroll: true}); }catch(err){ try{ ni.focus(); }catch(e2){} }
+          return;
+        }
+      }
+      /* Контакт под выбранный канал. Пустое или неполное поле ловим здесь: до 4 ноя
+         такая заявка уходила на сервер и возвращалась общей ошибкой тостом, а поле
+         никак не подсвечивалось — человек не понимал, что именно не так. */
+      var ci = $('[data-ch-input]', f);
+      if(ci){
+        var kind = f._ch || 'phone', val = (ci.value || '').trim();
+        if(!chValid(kind, val)){
+          var ce = $('.cerr', f);
+          if(!ce){
+            ce = document.createElement('p'); ce.className = 'cerr'; ce.setAttribute('role', 'alert');
+            (ci.closest('.field') || ci.closest('.lmag__row') || ci).insertAdjacentElement('afterend', ce);
+          }
+          ce.textContent = chErrText(kind, !val);
+          try{ ci.focus({preventScroll: true}); }catch(err){ try{ ci.focus(); }catch(e2){} }
+          return;
+        }
+      }
+      /* Ник Telegram уходит с «@»: на сервере по ней он и отличается от случайного слова,
+         а в карточке CRM попадает в поле мессенджера, а не в E-mail. */
+      if(ci && (f._ch === 'tg')){
+        var tv = (ci.value || '').trim();
+        if(tv && !/\d{5}/.test(tv.replace(/\D+/g, '')) && tv.charAt(0) !== '@') ci.value = '@' + tv;
+      }
       var extra = f._extra ? f._extra() : null;
       // send.php: имя обязательно (от 2 букв) — у форм «только телефон» подставляем «Без имени»; согласие — обязательно
-      var payload = {form: f.getAttribute('data-form'), name: (($('[name=name]', f) || {}).value || '').trim() || 'Без имени', phone: (($('[name=phone]', f) || {}).value || '').trim(), message: ICE.packMessage(f, extra), page: location.pathname, consent: c && c.checked ? '1' : ''};
+      var payload = {form: f.getAttribute('data-form'), name: (($('[name=name]', f) || {}).value || '').trim() || 'Без имени', phone: (($('[name=phone]', f) || {}).value || '').trim(), message: ICE.packMessage(f, extra), page: location.pathname, consent: agreed ? '1' : ''};
+      /* Канал уходит отдельным полем: по нему send.php выбирает ответственного в CRM
+         (решение пользователя 4 ноя: звонки — Наталья, переписка — Полина). В message
+         он тоже попадает строкой «Канал: …» — это для человека, а поле для машины. */
+      if(f._ch) payload.channel = f._ch;
       var utm = ICE.utm(); Object.keys(utm).forEach(function(k){ payload[k] = utm[k]; });
       var cid = ICE.cid(); if(cid) payload.ym_cid = cid;
       /* Номер визита Roistat — по нему он связывает сделку в CRM с рекламным кликом.
@@ -640,8 +877,17 @@
         f.classList.add('is-sent'); f.dispatchEvent(new CustomEvent('ice:sent', {bubbles:true})); return;
       }
       var fd = new FormData(); Object.keys(payload).forEach(function(k){ fd.append(k, payload[k]); });
-      fetch(f.getAttribute('action') || '/send.php', {method:'POST', body:fd}).then(function(r){ return r.json().catch(function(){ return {ok: r.ok}; }); }).catch(function(){ return {ok: false}; }).then(function(res){
-        if(res && res.ok){
+      /* Пока заявка уходит, кнопка показывает это и не принимает второе нажатие */
+      var sb = e.submitter || $('button[type=submit]', f);
+      f._busy = true;
+      if(sb){ sb._html = sb.innerHTML; sb.disabled = true; sb.setAttribute('aria-busy', 'true'); sb.textContent = 'Отправляем…'; }
+      /* Успех — только явный ответ send.php {"ok":true}. Ответ, который не разобрался как JSON,
+         больше не считается успехом по коду 200: такой ответ не значит, что заявка принята,
+         а цели lead/cnv_* оплачивает Директ. */
+      fetch(f.getAttribute('action') || '/send.php', {method:'POST', body:fd}).then(function(r){ return r.json().catch(function(){ return {ok: false}; }); }).catch(function(){ return {ok: false}; }).then(function(res){
+        f._busy = false;
+        if(sb){ sb.innerHTML = sb._html; sb.disabled = false; sb.removeAttribute('aria-busy'); }
+        if(res && res.ok === true){
           f.classList.add('is-sent'); f.dispatchEvent(new CustomEvent('ice:sent', {bubbles:true}));
           /* Две цели сразу: общая 'lead' — на неё оптимизируются кампании (конверсий
              больше, обучение быстрее), раздельная — чтобы видеть цену заявки по посадочной.
@@ -654,6 +900,53 @@
         else ICE.toast((res && res.error) || 'Не отправилось. Позвоните нам — ответим сразу.');
       });
     });
+  }
+
+  /* Телефон: пока человек у формы, поверх неё ничего не лежит.
+     27 окт замерили: у квиза кнопку «Получить расчёт» целиком накрывала панель
+     «Позвонить · Рассчитать заказ» (нажатие уходило в панель), а в первом экране
+     посадочных плашка cookie закрывала поле телефона и кнопку.
+     is-form-view — форма на экране, is-typing — поле в фокусе (открыта клавиатура);
+     что прятать, решает ds.css. */
+  function mobileForms(typed){
+    var narrow = matchMedia('(max-width:760px)');
+    if('IntersectionObserver' in window){
+      var vis = [];
+      var io = new IntersectionObserver(function(es){
+        es.forEach(function(en){
+          var i = vis.indexOf(en.target);
+          if(en.isIntersecting && i < 0) vis.push(en.target); else if(!en.isIntersecting && i >= 0) vis.splice(i, 1);
+        });
+        html.classList.toggle('is-form-view', vis.length > 0);
+      }, {threshold: .15});
+      /* формы в окнах (.sheet) не считаем: закрытое окно лежит на экране невидимым,
+         и наблюдатель считал бы его формой «на экране» постоянно */
+      $$('form[data-form]').forEach(function(f){ if(!f.closest('.sheet,dialog')) io.observe(f); });
+    }
+    var off = null;
+    document.addEventListener('focusin', function(e){
+      if(!typed(e.target) || !e.target.closest('form[data-form]')) return;
+      clearTimeout(off); html.classList.add('is-typing');
+      if(narrow.matches) setTimeout(function(){ fit(e.target); }, 350);   // клавиатура успевает выехать
+    });
+    document.addEventListener('focusout', function(e){
+      if(!typed(e.target)) return;
+      off = setTimeout(function(){ html.classList.remove('is-typing'); }, 200);   // переход между полями — без мигания
+    });
+    /* Браузер прокручивает только само поле — кнопка отправки остаётся под клавиатурой.
+       Подкручиваем так, чтобы над клавиатурой было видно и поле, и кнопку (или хотя бы
+       поле у верха экрана, под шапкой). */
+    function fit(el){
+      if(document.activeElement !== el) return;
+      var f = el.closest('form[data-form]'), scope = el.closest('fieldset') || f;
+      var btn = $$('button[type=submit]', scope).filter(function(b){ return b.offsetParent; })[0]; if(!btn) return;
+      var vv = window.visualViewport, top = vv ? vv.offsetTop : 0, h = vv ? vv.height : innerHeight;
+      var head = $('[data-head]'), hb = head ? Math.max(0, head.getBoundingClientRect().bottom - top) : 0;
+      var need = btn.getBoundingClientRect().bottom - (top + h - 12);
+      var room = el.getBoundingClientRect().top - (top + hb + 12);
+      var d = Math.min(need, room);
+      if(d > 0) window.scrollBy({top: d, behavior: 'smooth'});
+    }
   }
 
   /* ── поиск ─────────────────────────────────────────────────────────────── */
@@ -759,6 +1052,49 @@
     }, 500);
   }
 
+  /* переход в мессенджер из виджета Битрикс24 ─────────────────────────────
+     ⚠️⚠️ Telegram и WhatsApp уводят человека в приложение, то есть события
+     онлайн-чата (widgetOpen / userMessage → chat_open / chat_msg) не приходят
+     вовсе: без этой отметки уход в мессенджер не виден ни в Метрике, ни в
+     дашборде, ни в CRM (сделку из обращения открытая линия пока не создаёт).
+     Виджет рисуется в обычном DOM (shadow-дерева у него нет), поэтому ловим
+     клик делегированием на document в фазе перехвата.
+     ⚠️ Канал определяем по совокупности признаков (классы, href, подсказки),
+     а не точным селектором: разметку виджета задаёт портал, и она меняется
+     при каждой пересборке в Контакт-центре. */
+  function msgrChannel(el){
+    var hay = '';
+    for(var n = el, i = 0; n && n !== document && i < 6; n = n.parentElement, i++){
+      var c = n.className;
+      if(c && typeof c === 'object') c = c.baseVal;      /* у SVG className — объект */
+      if(c) hay += ' ' + c;
+      if(n.getAttribute){
+        var a = [n.getAttribute('href'), n.getAttribute('title'), n.getAttribute('aria-label'), n.getAttribute('data-id')];
+        for(var j = 0; j < a.length; j++) if(a[j]) hay += ' ' + a[j];
+      }
+    }
+    hay = hay.toLowerCase();
+    if(/t\.me|telegram|телеграм/.test(hay)) return 'tg';
+    if(/wa\.me|whatsapp|whats_app|ватсап/.test(hay)) return 'wa';
+    if(/vk\.me|vk\.com|vkontakte|вконтакте/.test(hay)) return 'vk';
+    if(/viber/.test(hay)) return 'viber';
+    return '';
+  }
+  function msgrClicks(){
+    var sent = {};
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if(!t || !t.closest) return;
+      /* только внутри виджета: иначе сторонняя ссылка дала бы ложную цель */
+      if(!t.closest('[class*="b24-"]')) return;
+      var ch = msgrChannel(t);
+      if(!ch || sent[ch]) return;
+      sent[ch] = 1;
+      ICE.goal('msgr_click', {channel: ch, page: location.pathname});
+      ICE.goal('msgr_' + ch, {page: location.pathname});
+    }, true);
+  }
+
   /* ── отложенные кадры (карта) ───────────────────────────────────────────
      ⚠️ loading="lazy" у <iframe> Safari игнорирует, поэтому карта грузилась
      сразу и тянула событие load страницы до ~20 с. Ставим адрес сами, когда
@@ -793,6 +1129,43 @@
     }, true);
   }
 
-  function init(){ header(); sideMenu(); reveal(); heroVideo(); rails(); hscroll(); accordions(); themes(); yacht(); liquid(); sheets(); forms(); search(); draftNote(); loader(); cookieBar(); b24chat(); lazyFrames(); outbound(); }
+  /* Когда перезвоним — строка под кнопкой заявки (разметка — tpl.callback_note).
+     Время московское, а не посетителя: офис в Петербурге, реклама — по всей России.
+     Будни 10:00–18:00 — дневной текст как есть; иначе «нерабочее время» с ближайшим утром.
+     Праздники не учитываем — в них строка обещает «завтра», это терпимо. */
+  function callbackNote(){
+    var els = $$('[data-cbnote]'); if(!els.length) return;
+    var day, h;
+    try{
+      var parts = new Intl.DateTimeFormat('en-US', {timeZone:'Europe/Moscow', weekday:'short', hour:'numeric', minute:'numeric', hourCycle:'h23'}).formatToParts(new Date());
+      parts.forEach(function(p){ if(p.type === 'weekday') day = p.value; if(p.type === 'hour') h = +p.value; if(p.type === 'minute') h += p.value / 60; });
+    }catch(e){ return; }
+    var wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].indexOf(day) > -1;
+    if(wd && h >= 10 && h < 17.5) return;   // рабочий день 10:00–17:30 (как в карточке Яндекса, 5 ноя 2026)
+    var when = wd && h < 10 ? 'сегодня' : (wd && day !== 'Fri' ? 'завтра' : 'в понедельник');
+    els.forEach(function(el){ el.textContent = el.getAttribute('data-off').replace('{when}', when); el.classList.add('is-off'); });
+  }
+
+  /* Глубина прокрутки: scroll_50 и scroll_75 — раз за просмотр страницы.
+     Без них не отличить «не доскроллил» от «увидел и не заинтересовало»:
+     28 окт на 505 рекламных визитов ткань открыли 1 раз, видео — 0, и причина неизвестна.
+     Считаем только после настоящей прокрутки — короткая страница не даёт цель сразу при загрузке. */
+  function scrollDepth(){
+    var marks = [[.5, 'scroll_50'], [.75, 'scroll_75']], ticking = false;
+    function check(){
+      ticking = false;
+      var h = document.documentElement.scrollHeight; if(!h) return;
+      var k = (scrollY + innerHeight) / h;
+      marks = marks.filter(function(m){
+        if(k < m[0]) return true;
+        ICE.goal(m[1], {page: location.pathname}); return false;
+      });
+      if(!marks.length) removeEventListener('scroll', on);
+    }
+    function on(){ if(!ticking){ ticking = true; requestAnimationFrame(check); } }
+    addEventListener('scroll', on, {passive: true});
+  }
+
+  function init(){ header(); sideMenu(); reveal(); heroVideo(); rails(); hscroll(); accordions(); themes(); yacht(); liquid(); sheets(); channels(); forms(); draftWatch(); search(); draftNote(); loader(); cookieBar(); b24chat(); msgrClicks(); lazyFrames(); outbound(); scrollDepth(); callbackNote(); }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

@@ -164,7 +164,8 @@
       /* сетка */
       var colorSel = state.sel.col;
       var nColors = 0; list.forEach(function(a){ a.cols.forEach(function(c){ if((!colorSel.length || colorSel.some(function(x){ return c[2].split('|').indexOf(x) >= 0; })) && (!state.inStock || c[7])) nColors++; }); });
-      $('[data-count]', root).textContent = state.view === 'colors' ? nColors + ' ' + plural(nColors, 'цвет', 'цвета', 'цветов') : list.length + ' ' + plural(list.length, 'артикул', 'артикула', 'артикулов') + ' · ' + nColors + ' ' + plural(nColors, 'цвет', 'цвета', 'цветов');
+      var cnt = state.view === 'colors' ? nColors + ' ' + plural(nColors, 'цвет', 'цвета', 'цветов') : list.length + ' ' + plural(list.length, 'артикул', 'артикула', 'артикулов') + ' · ' + nColors + ' ' + plural(nColors, 'цвет', 'цвета', 'цветов');
+      $$('[data-count]', root).forEach(function(el){ el.textContent = cnt; });
       $$('[data-view]', root).forEach(function(b){ b.classList.toggle('is-on', b.getAttribute('data-view') === state.view); });
       if(state.view === 'arts'){
         cgrid.hidden = true; grid.hidden = false; $('[data-more]', root).hidden = true;

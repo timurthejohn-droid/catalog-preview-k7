@@ -733,6 +733,11 @@ html.no-loader .loader{display:none}
 .dark .check input:checked{background:var(--yellow);border-color:var(--yellow)}
 .check input:checked::after{content:"";width:9px;height:5px;border-left:1.5px solid var(--on-dark);border-bottom:1.5px solid var(--on-dark);transform:rotate(-45deg) translate(1px,-1px)}
 .dark .check input:checked::after{border-color:var(--ink)}
+/* нажали «Отправить» без согласия — подсвечиваем галочку и пишем, что не так */
+.check.is-err input{border-color:#C8102E;border-width:2px;background:rgba(200,16,46,.06)}
+.check__err{margin:-2px 0 0;font:500 13px/1.4 var(--f-sans,inherit);color:#C8102E}
+.dark .check__err{color:var(--yellow)}
+button[aria-busy="true"]{opacity:.7;cursor:progress}
 .hp{position:absolute!important;left:-9999px!important;opacity:0}
 .form__ok{display:none;gap:10px;padding:18px;background:var(--butter);color:var(--ink)}
 .form.is-sent .form__ok{display:grid}
@@ -1112,6 +1117,7 @@ html.no-loader .loader{display:none}
 .lbar__t span{display:block;margin-top:8px;color:var(--on-dark-2);font-size:14px}
 .lbar .form{grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:10px}
 .lbar .form .check{grid-column:1/-1;order:9}
+.lbar .form .check__err{grid-column:1/-1;order:9}
 .lbar .form .btn{min-height:50px}
 .lbar .form__ok{grid-column:1/-1}
 @media (max-width:1100px){.lbar__in{grid-template-columns:1fr}.lbar .form{grid-template-columns:1fr 1fr}.lbar .form .btn{grid-column:1/-1}}
@@ -1265,6 +1271,15 @@ html.no-loader .loader{display:none}
   body:has(.lmbar.is-on) .b24-widget-button-position-bottom-right{
     bottom:calc(84px + env(safe-area-inset-bottom)) !important;
   }
+}
+/* Телефон: у формы поверх неё ничего не лежит (классы ставит core.js → mobileForms).
+   27 окт: панель закрывала кнопку «Получить расчёт» квиза, плашка cookie — поле телефона
+   и кнопку в первом экране посадочных. Плашка cookie не подтверждается, а уходит
+   и вернётся, когда форма уйдёт с экрана. Кнопку чата прячем только при вводе. */
+@media (max-width:760px){
+  html.is-form-view .lmbar.is-on,html.is-typing .lmbar.is-on,body:has(.sheet.is-open) .lmbar.is-on{transform:translateY(110%)}
+  html.is-form-view .ckbar.is-on,html.is-typing .ckbar.is-on,body:has(.sheet.is-open) .ckbar.is-on{transform:translateY(calc(100% + 96px));pointer-events:none}
+  html.is-typing .b24-widget-button-wrapper,html.is-typing [class*="b24-widget-button-position"]{visibility:hidden !important}
 }
 
 /* «вместо Китая»: сравнение, сроки, калькулятор */
@@ -1830,15 +1845,18 @@ main [id]{scroll-margin-top:calc(var(--cnav-h) + 24px)}
 
 /* ── первый экран ── */
 @media (max-width:900px){
-  /* телефон/планшет: заголовок → фото-полоса → заявка → пояснение и факты (первым экраном — заявка) */
+  /* телефон: заголовок → подзаголовок → заявка → плашки/фото → факты (правка 30 окт 2026:
+     подзаголовок поднят к заголовку, форма идёт сразу под ним, фото ушло ниже) */
   .lhero__grid{display:flex;flex-direction:column;gap:0;padding-top:12px}
-  .lhero__txt,.lhero__txt > div,.lhero__side{display:contents}
+  /* ⚠️ facts исключены: с 30 окт это прямой ребёнок .lhero__txt, и display:contents
+     рассыпал бы его плашки отдельными элементами в начало сетки */
+  .lhero__txt,.lhero__txt > div:not(.lhero__facts),.lhero__side{display:contents}
   .lhero .crumbs{order:0;margin-bottom:10px}
   .lhero__eyebrow{order:1;margin-bottom:10px}
   .lhero__h{order:2;font-size:clamp(32px,min(9vw,5.4svh),56px)}
-  .lhero__frame{order:3;margin-top:clamp(12px,2svh,20px);min-height:0;height:clamp(110px,19svh,260px);flex:none;max-height:none}
-  .lhero__side .lmag{order:4;margin:-26px 10px 0}
-  .lhero__lead{order:5;margin-top:22px}
+  .lhero__frame{order:5;margin-top:clamp(12px,2svh,20px);min-height:0;height:clamp(110px,19svh,260px);flex:none;max-height:none}
+  .lhero__side .lmag{order:4;margin:18px 0 0}
+  .lhero__lead{order:3;margin-top:16px}
   .lhero__facts{order:6}
   .lhero__chip{top:8px;left:8px;padding:6px 8px;font-size:11.5px}
 }
@@ -2551,11 +2569,11 @@ img[src*="/media/p/v2-"]{object-position:50% 18%}
   .pgrid--plp .pcard__name{font-size:15px}
 }
 
-/* ═══ ВРЕМЕННЫЙ РОЛИК С ПРОИЗВОДСТВА (20 окт 2026, до пересъёмки) ═══
-   Ролик квадратный (848×848), рамки на главной и на «Швейном производстве» — горизонтальные, как были.
-   Кадр сдвинут вверх: подпись «Швейное производство Айсберг» стоит на 21–25% высоты и при обрезке по центру срезалась.
+/* ═══ РОЛИК С ПРОИЗВОДСТВА ═══
+   20 окт 2026 стоял временный квадратный ролик со вшитой подписью — кадр сдвигали вверх (50% 30%).
+   С 14 ноя ролик «Айсберг производство» (4:3, без подписей) — кадр по центру.
    В полноэкранном плеере ролик целиком (object-fit:contain в .vmodal__stage). */
-.hv__frame video,.lvideo video{object-position:50% 30%}
+.hv__frame video,.lvideo video{object-position:50% 50%}
 
 /* ═══ ГЛАВНАЯ: ЧЁРНЫЙ ПЕРВЫЙ ЭКРАН (21 окт 2026, просьба пользователя) ═══
    Модификатор только для главной iceberg (у tkany тот же .hv остаётся кремовым). Фон — чёрный тёмных блоков сайта,
@@ -2579,3 +2597,284 @@ img[src*="/media/p/v2-"]{object-position:50% 18%}
 .clients--dark .lbl{color:var(--on-dark-2)}
 .clients--dark .marq{border-top-color:var(--line-dark);border-bottom-color:var(--line-dark)}
 .clients--dark .marq__row span.sep{color:var(--on-dark-2)}
+
+/* ══ ПЕРВЫЕ ЭКРАНЫ И ТЕЛЕФОН (28 окт 2026, разбор Метрики 23–27 окт) ════════════════════════════════
+   Телефон — 65 % рекламного трафика: отказы 60 %, до формы доходят 2,9 % против 7,9 % на компьютере.
+   Список правок и цифры — 07-analytics/Правки-сайта-по-поведению-Метрики.md. */
+
+/* 1.1 — виды спорта плашками прямо в первом экране хаба (сетку ниже видели 14 % визитов) */
+.lhero__chips{display:grid;gap:8px;margin-top:clamp(16px,2svh,24px)}
+.lhero__chips div{display:flex;flex-wrap:wrap;gap:6px}
+.lhero__chips a{display:inline-flex;align-items:center;min-height:36px;padding:6px 12px;border:1px solid var(--ink);background:var(--paper);
+  font-size:14px;line-height:1.2;letter-spacing:-.01em;color:var(--ink);text-decoration:none;transition:background .2s,border-color .2s}
+.lhero__chips a:hover,.lhero__chips a:focus-visible{background:var(--yellow);border-color:var(--yellow)}
+/* 1.4 — четвёртый факт («отгрузка по всей России»): на компьютере сетка 2 × 2 вместо ряда из трёх;
+   на телефоне остаётся список «подпись — значение» */
+@media (min-width:901px){.lhero__facts:has(> div:nth-child(4)){grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* 1.5 — когда перезвоним (текст и время — tpl.callback_note + core.js callbackNote) */
+/* без значка: квадратик рядом с галочкой согласия принимали за вторую галочку */
+/* Согласие на обработку данных: строка под кнопкой вместо галочки (29 окт 2026).
+   Мельче и тише, чем «перезвоним» — это сноска, а не обещание. */
+.cnote{margin:0;font-size:11.5px;line-height:1.4;color:var(--ink-3,var(--ink-2));opacity:.8}
+.cnote a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.dark .cnote{color:var(--on-dark-2)}
+.lfinal__card .cnote{color:var(--ink-2)}
+/* Комментарий в квизе — под раскрывашкой: на последнем шаге должно остаться одно поле */
+.cq__more{margin:0}
+.cq__more > summary{cursor:pointer;font-size:13px;color:var(--ink-2);list-style:none;padding:2px 0;
+  text-decoration:underline;text-underline-offset:3px;text-decoration-style:dotted}
+.cq__more > summary::-webkit-details-marker{display:none}
+.cq__more > summary:hover{color:var(--ink)}
+.cq__more[open] > summary{margin-bottom:8px}
+.dark .cq__more > summary{color:var(--on-dark-2)}
+/* Подпись финального шага квиза */
+.cq__last{margin:-4px 0 2px;font-size:13px;line-height:1.4;color:var(--ink-2)}
+.dark .cq__last{color:var(--on-dark-2)}
+.cbnote{margin:0;font-size:13px;line-height:1.4;color:var(--ink-2)}
+.cbnote.is-off{padding:8px 10px;background:var(--butter);border-left:3px solid var(--yellow);color:var(--ink)}
+.dark .cbnote{color:var(--on-dark-2)}
+.dark .cbnote.is-off{background:rgba(248,240,0,.12);color:var(--on-dark)}
+.lfinal__card .cbnote{color:var(--ink-2)}
+.lfinal__card .cbnote.is-off{background:var(--butter);color:var(--ink)}
+
+/* квиз: «Дальше →» — главная кнопка шага, чёрная (была контурной и терялась рядом с «Назад») */
+.cq__nav [data-cq-next]{background:var(--ink);border-color:var(--ink);color:var(--on-dark)}
+.cq__nav [data-cq-next]:hover{background:var(--yellow);border-color:var(--yellow);color:var(--ink)}
+
+/* 2.2 — cookie: «Принять» жёлтая и заметная (была чёрной на тёмном фоне), ссылка — второстепенная */
+.ckbar .btn{order:2}
+.ckbar .btn--primary{background:var(--yellow);border-color:var(--yellow);color:var(--ink)}
+.ckbar .btn--primary:hover{background:var(--on-dark);border-color:var(--on-dark);color:var(--ink)}
+.ckbar a{font-size:.92em}
+
+@media (max-width:760px){
+  /* хаб: на телефоне плашки видов спорта встают вместо фото — заголовок → вид спорта → заявка */
+  .lhero__chips{order:5;margin-top:16px;gap:6px}
+  .lhero__chips .lbl{font-size:10.5px}
+  .lhero__chips div{gap:6px}
+  .lhero__chips div{gap:5px}
+  .lhero__chips a{min-height:38px;padding:6px 10px;font-size:13.5px}
+  .lhero--chips .lhero__frame{display:none}
+  .lhero--chips .lhero__side .lmag{margin:16px 0 0}
+
+  /* форма первого экрана: поле и кнопка на всю ширину, кнопка крупнее и читаемее */
+  .lmag__row{grid-template-columns:1fr !important;gap:8px}
+  .lmag__row .input{min-height:54px;font-size:18px}
+  .lmag__row .btn{min-height:56px;padding:0 18px;font-size:13px;justify-content:space-between}
+  .lmag__seg button{min-height:50px;font-size:10.5px}
+  .lmag__p{font-size:15px}
+
+  /* галочка согласия — крупнее: в неё целятся пальцем, а промах = заявка не уходит */
+  .check{grid-template-columns:24px 1fr;gap:10px;font-size:12.5px}
+  .check input{width:22px;height:22px;margin:0}
+  .cbnote{font-size:13.5px}
+
+  /* квиз: 3 колонки и подписи целиком — в 4 колонки они обрезались до «Спортивная и…», «Трикотаж: худи,…» */
+  .cq__tiles{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:10px 8px}
+  .cq__tt{display:block;-webkit-line-clamp:unset;overflow:visible;font-size:12.5px;line-height:1.3}
+  .cq__nav .btn{min-height:46px;padding:0 16px;font-size:12px}
+
+  /* подписи под видами спорта — обычным шрифтом: моноширинный капс в 11 px на телефоне не читается */
+  .ldir__s{font:400 13.5px/1.4 var(--f-sans);letter-spacing:0;text-transform:none}
+
+  /* cookie: одна строка с кнопкой справа и меньше места на экране */
+  .ckbar{flex-direction:row;align-items:center;gap:12px;padding:10px 12px;font-size:12px;line-height:1.35}
+  .ckbar .btn{min-height:46px;padding:0 18px;font-size:12px}
+}
+
+/* ═══ ПЕРВЫЙ ЭКРАН: ФОРМА ВЫШЕ ФОТО (30 окт 2026, правка пользователя) ═══
+   Было: справа сверху крупное фото, форма под ним с наездом −84px — на хабе
+   спортодежды до неё доходили единицы (56% отказов, 17 секунд на странице).
+   Стало: форма первой, фото под ней и вдвое ниже; на телефоне — заголовок,
+   подзаголовок, сразу форма, и только потом плашки и факты. */
+@media (min-width:901px){
+  .lhero__side{justify-content:flex-start}
+  .lhero__side .lmag{order:-1;margin:0 0 14px;position:relative;z-index:3}
+  .lhero__frame{order:1;flex:0 0 auto;aspect-ratio:16/10;min-height:clamp(140px,18svh,230px);max-height:clamp(150px,22svh,250px)}
+}
+.lhero__chip{font-size:12px}
+.lhero__chip b{font-weight:600;background:var(--yellow);padding:1px 5px;margin-right:2px}
+
+/* ═══ БРЕНДЫ В ПЕРВОМ ЭКРАНЕ НА ТЕЛЕФОНЕ (1 ноя 2026, правка пользователя) ═══
+   На хабе фото на телефоне скрыто (.lhero--chips), а плашка «21 бренд шьёт у нас»
+   лежит внутри него — то есть не показывалась вовсе. Показываем её отдельной
+   строкой между подзаголовком и формой: доверие читается до заявки. */
+@media (max-width:900px){
+  .lhero--chips .lhero__frame{display:block;order:4;aspect-ratio:auto;height:auto;
+    min-height:0;max-height:none;margin:14px 0 0;background:none;overflow:visible}
+  .lhero--chips .lhero__frame > img,
+  .lhero--chips .lhero__frame > .ph,
+  .lhero--chips .lhero__frame > [class*="ph--"]{display:none}
+  .lhero--chips .lhero__chip{position:static;max-width:none;border:1px solid var(--ink);
+    background:var(--paper);padding:9px 11px;font-size:12.5px;line-height:1.4}
+  .lhero--chips .lhero__side .lmag{order:5}
+  .lhero--chips .lhero__chips{order:6}
+  .lhero--chips .lhero__facts{order:7}
+}
+/* на телефоне поджимаем отступы первого экрана, чтобы кнопка заявки помещалась */
+@media (max-width:560px){
+  .lhero__grid{padding-top:6px}
+  .lhero__eyebrow{margin-bottom:6px}
+  .lhero__lead{margin-top:10px}
+  .lhero--chips .lhero__frame{margin-top:8px}
+  .lhero--chips .lhero__chip{padding:7px 10px;font-size:12px}
+  .lhero--chips .lhero__side .lmag{margin-top:10px}
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ВЫБОР СПОСОБА СВЯЗИ В ФОРМАХ (4 ноя 2026)
+   Повод: из начавших заполнять заявку отправлял примерно каждый седьмой, а поле
+   было одно — телефон, то есть заявка равнялась согласию на звонок. Ряд кнопок
+   над полем показывает, что можно иначе, до того как человек закроет вкладку.
+   Разметку даёт tpl.chs() / contact_field(), поведение — core.js (channels()).
+   ════════════════════════════════════════════════════════════════════════════ */
+.chs{margin:0 0 12px}
+.chs__q{display:block;font-size:13px;color:var(--ink-2);margin:0 0 7px}
+.chs__row{display:flex;border:1px solid var(--ink);background:var(--paper)}
+.chs__b{flex:1 1 0;min-width:0;appearance:none;background:none;border:0;border-right:1px solid var(--ink);
+  padding:9px 5px;font:inherit;font-size:13.5px;line-height:1.15;color:var(--ink);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;text-align:center}
+.chs__b:last-child{border-right:0}
+.chs__b:hover{background:var(--butter)}
+.chs__b[aria-pressed="true"]{background:var(--yellow)}
+.chs__b svg{width:15px;height:15px;flex:0 0 auto}
+.chs__b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* в сетке первого экрана отступы задаёт сам .lmag */
+.lmag .chs{margin:0}
+/* четыре кнопки в один ряд на узком экране не помещаются и рвутся неровно — сетка 2×2 */
+@media (max-width:620px){
+  .chs__row{display:grid;grid-template-columns:1fr 1fr}
+  .chs__b{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+  .chs__b:nth-child(2n){border-right:0}
+  .chs__b:nth-last-child(-n+2){border-bottom:0}
+}
+/* ошибка под полем контакта: видимая причина, почему заявка не ушла */
+.cerr{font-size:13px;color:#B3261E;margin:7px 0 0}
+/* На маленьких телефонах ряд каналов добавляет ~90 px, а форма первого экрана должна
+   помещаться целиком (правка 1 ноя). Поэтому там кнопки ниже, а в компактной форме
+   вопрос убран: рядом с полем ввода четыре подписанные кнопки понятны и без него. */
+@media (max-width:560px){
+  .chs__b{min-height:40px;padding:7px 5px;font-size:13px}
+  .chs__q{margin-bottom:5px}
+}
+@media (max-width:560px) and (max-height:740px){
+  .lmag .chs__q{display:none}
+}
+/* подпись «— необязательно» у поля имени: тише основной подписи, но читаемо */
+.field .opt{color:var(--ink-3);font-size:12px;font-style:normal}
+
+/* ── результат квиза: что человек получает за пройденные 4 шага (4 ноя 2026) ──
+   28 из 46 дошедших до последнего шага уходили, не коснувшись поля контакта:
+   квиз обещал расчёт, а показывал только просьбу оставить телефон. */
+.cq__res{border:1px solid var(--ink);background:var(--paper);padding:13px 15px;margin:0 0 14px}
+.cq__res-h{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 9px}
+.cq__res ul{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.cq__res li{position:relative;padding-left:21px;font-size:14px;line-height:1.45}
+.cq__res li::before{content:'';position:absolute;left:2px;top:6px;width:9px;height:5px;
+  border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(-45deg)}
+.cq__res li b{font-weight:600;background:var(--yellow);padding:0 4px}
+.cq__res-f{margin:11px 0 0;padding-top:10px;border-top:1px solid var(--line);
+  font-size:13.5px;color:var(--ink-2)}
+@media (max-width:560px){
+  .cq__res{padding:11px 12px;margin-bottom:12px}
+  .cq__res li{font-size:13.5px}
+}
+
+/* ── ХАБ СПОРТОДЕЖДЫ: виды спорта выше формы на телефоне (4 ноя 2026) ────────
+   Замер: плашки начинались на 864 px при экране 844 — человек, пришедший
+   по запросу «пошив формы для футбола», не видел своего вида спорта вообще,
+   пока не проскроллит. При этом хаб — навигационная страница: его работа
+   увести на нужный вид спорта, где отказы 12–18 % против 56–66 % у самого хаба.
+   Поэтому здесь, в отличие от остальных посадочных, порядок обратный правке
+   1 ноя: сначала плашки, форма сразу под ними. */
+@media (max-width:900px){
+  .lhero--chips .lhero__chips{order:4;margin-top:14px}
+  .lhero--chips .lhero__side .lmag{order:5;margin:16px 0 0}
+  .lhero--chips .lhero__frame{order:6}
+  .lhero--chips .lhero__facts{order:7}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   УСЛОВИЯ ПОД ЗВЁЗДОЧКОЙ У ЛИД-МАГНИТА + ОБЯЗАТЕЛЬНОЕ ИМЯ (12 ноя 2026)
+   Отшив образца бесплатен не всегда (условия пользователя), поэтому у вкладки
+   «Образец изделия» под обещанием появляется сноска. Мелко, но читаемо: на подложке
+   с цветной полосой слева, а не серым по серому — иначе условие формально есть,
+   а фактически его никто не видит.
+   ══════════════════════════════════════════════════════════════════════════ */
+.lmag__note{margin:-4px 0 10px;padding:8px 10px;font-size:12.5px;line-height:1.45;
+  color:var(--ink-2);background:var(--cream-2);border-left:3px solid var(--yellow)}
+.lmag__note[hidden]{display:none}
+.dark .lmag__note{color:var(--on-dark-2);background:rgba(244,241,232,.06)}
+/* имя в компактной форме первого экрана: без подписи-строки, её роль играет placeholder */
+.field--tight{display:block;margin:0 0 8px}
+.field--tight>.input{width:100%}
+@media (max-width:560px){.lmag__note{font-size:12px;padding:7px 9px}}
+
+/* ⚠️ Обязательное поле имени (12 ноя 2026) добавило ~68 px, и на низких телефонах кнопка
+   заявки ушла за первый экран: замер 360×640 дал низ кнопки на 675 при высоте экрана 640.
+   Возвращаем её на место, срезая ОФОРМЛЕНИЕ, а не поля: на низких экранах ряд каналов
+   становится одной строкой без иконок (вместо сетки 2×2 — она стоила два ряда), поле имени
+   ниже. Подписи каналов остаются — по ним человек и выбирает, куда ему ответят. */
+@media (max-height:740px){
+  .lmag .chs__row{display:flex}
+  .lmag .chs__b{min-height:36px;padding:6px 3px;font-size:11.5px;
+    border-bottom:0;border-right:1px solid var(--ink)}
+  .lmag .chs__b:last-child{border-right:0}
+  .lmag .chs__b svg{display:none}
+  .lmag .field--tight{margin-bottom:6px}
+  .lmag .field--tight>.input{min-height:42px;padding-top:8px;padding-bottom:8px}
+}
+
+/* ═══ РОЛИК С ПРОИЗВОДСТВА В ПЕРВОМ ЭКРАНЕ ПОСАДОЧНЫХ (14 ноя 2026, правки пользователя) ═══
+   «Швейное производство», «Спортивная одежда», «Вместо Китая», мерч: вместо фото — ролик без звука
+   по кругу, по нажатию — плеер со звуком (доверие: видно, что цех настоящий).
+   Порядок (решение пользователя): на компьютере справа СВЕРХУ ролик, под ним форма; на телефоне
+   заголовок → подзаголовок → ролик → форма. Отменяет для этих страниц «форма выше фото» от 1 ноя.
+   На «Спортивной одежде» ролик встал вместо кнопок «Ваш вид спорта» (виды спорта — ниже, в «Направлениях»).
+   Ролик 4:3, рамка 16:9: в прежней полосе ~2,8:1 было бы видно меньше половины кадра. */
+.lhero__frame.lhero__frame--video{cursor:pointer;background:var(--ink)}
+.lhero__frame--video > video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;transition:transform 1.4s var(--ease-out)}
+.lhero__frame--video:hover > video{transform:scale(1.03)}
+.lhero__frame--video:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.lhero__vbtn{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;display:inline-flex;align-items:center;gap:10px;
+  padding:13px 18px;background:var(--yellow);color:var(--ink);font:500 11.5px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.lhero__vbtn svg{width:12px;height:12px;flex:none}
+@media (min-width:901px){
+  .lhero__frame.lhero__frame--video{order:-2;aspect-ratio:16/9;height:auto;min-height:0;max-height:none;margin:0 0 18px}
+}
+@media (max-width:900px){
+  /* между подзаголовком (order 3) и формой (order 4): у рамки тоже 4, а в разметке она стоит раньше формы */
+  .lhero__frame.lhero__frame--video{order:4;aspect-ratio:16/9;height:auto;min-height:0;max-height:none;margin-top:16px}
+}
+
+/* ══ tkany на телефоне (18 ноя 2026, вопрос клиента «что с мобильной адаптацией») ══
+   Первый экран без пустоты над заголовком; блок «Производители» — подпись под заголовком, а не столбиком;
+   панель каталога в одну строку (была в три и занимала четверть экрана); на карточке артикула
+   кадр квадратный и миниатюры одной строкой — название и цена теперь в первом экране. */
+.plp__count--m{display:none}
+[data-site="tkany"] .sec-head > a.link{white-space:nowrap}
+@media (max-width:640px){
+  [data-site="tkany"] .hv--tk .hv__grid{min-height:0;padding-bottom:28px}
+  [data-site="tkany"] .sec-head{flex-wrap:wrap;align-items:flex-end}
+  [data-site="tkany"] .sec-head__aside{flex:1 1 100%;max-width:none}
+  .plp__bar .plp__count{display:none}
+  .plp__count--m{display:block;margin:2px 0 10px}
+  .plp__bar{flex-wrap:nowrap;padding:8px 0;gap:6px;margin-bottom:14px}
+  .plp__ctrl{flex-wrap:nowrap;width:100%;gap:6px}
+  .plp__filtbtn{flex:1 1 auto;min-width:0;padding-inline:10px}
+  .plp__ctrl .seg button{padding:0 9px;min-height:38px}
+  /* сортировка — значок: подписи в узкой строке не помещаются, список вариантов телефон покажет сам.
+     Шрифт 16px — иначе iPhone увеличивает страницу при нажатии на поле. */
+  .plp__ctrl .select{flex:0 0 44px;width:44px;min-height:40px;padding:0;font-size:16px;color:transparent;
+    background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%2316130F' stroke-width='1.6'%3E%3Cpath d='M5 3v12M2 12l3 3 3-3M13 15V3M10 6l3-3 3 3'/%3E%3C/svg%3E") no-repeat center/18px}
+  .plp__ctrl .select option{color:#16130F}
+  [data-site="tkany"] .crumbs{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+  [data-site="tkany"] .crumbs::-webkit-scrollbar{display:none}
+  .pdp{padding-top:12px;row-gap:24px}
+  .pdp__main{aspect-ratio:1}
+  .pdp__gal{grid-template-columns:repeat(5,minmax(0,1fr))}
+  [data-site="tkany"] .logos > *{min-height:64px;padding:12px 8px;text-align:center}
+}

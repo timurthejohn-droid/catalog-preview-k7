@@ -10,12 +10,19 @@
   /* 1. Лид-магниты: сегменты с бегущей плашкой, текст обещания и кнопка меняются */
   $$('[data-mag]').forEach(function(box){
     var seg = $('.lmag__seg', box), btns = $$('.lmag__seg button', box), p = $('.lmag__p', box),
-        sub = $('button[type=submit] .t', box), hid = $('input[name=magnet]', box), form = $('form', box);
+        sub = $('button[type=submit] .t', box), hid = $('input[name=magnet]', box), form = $('form', box),
+        note = $('[data-mag-note]', box);
     function set(i, focus){
       btns.forEach(function(b, j){ b.setAttribute('aria-checked', j === i ? 'true' : 'false'); b.tabIndex = j === i ? 0 : -1; });
       seg.style.setProperty('--k', i);
       var b = btns[i];
       p.innerHTML = b.getAttribute('data-p'); if(sub) sub.textContent = b.getAttribute('data-btn');
+      /* Сноска со звёздочкой — условия выбранного шага (образец отшиваем бесплатно не всегда,
+         условия пользователя 12 ноя 2026). Показываем только у той вкладки, к которой относится. */
+      if(note){
+        var nt = b.getAttribute('data-note') || '';
+        note.textContent = nt; note.hidden = !nt;
+      }
       if(hid) hid.value = b.textContent.trim();
       if(form && b.getAttribute('data-form')) form.setAttribute('data-form', b.getAttribute('data-form'));
       if(focus) b.focus();
@@ -248,6 +255,38 @@
       steps.forEach(function(s, j){ $$('input[type=radio]:checked', s).forEach(function(r){ out.push('<button type="button" data-cq-to="' + j + '">' + escH(r.value) + '</button>'); }); });
       if(f.elements.who && f.elements.who.value) out.unshift('<button type="button" data-cq-to="0">' + escH(f.elements.who.value) + '</button>');
       sum.innerHTML = out.length ? out.join('') : '';
+      result(f);
+    };
+    /* Что человек получает за пройденный квиз (4 ноя 2026).
+       Повод: из 46 дошедших до последнего шага 28 уходили, НЕ коснувшись поля контакта —
+       квиз называется расчётом, а показывал только просьбу оставить телефон.
+       ⚠️ Цен здесь нет намеренно: вилок по изделиям и тиражам производство ещё не дало,
+       а выдуманная цифра хуже её отсутствия. Всё перечисленное — подтверждённая фактура
+       (анкета производства 25 сент, решение о бесплатном образце 23 окт). */
+    var result = function(f){
+      var box = $('[data-cq-res]', f); if(!box) return;
+      var val = function(n){ var r = f.querySelector('input[name=' + n + ']:checked'); return r ? r.value : ''; };
+      var tir = val('tirazh'), big = /1 ?000/.test(tir) && /больше/.test(tir);
+      var rows = [];
+      if(/до 50/.test(tir)) rows.push('Такой тираж берём: минимум по эластике — от 30–50 изделий');
+      /* Условия отшива образца (пользователь, 12 ноя 2026; отменяет «бесплатно без условий» от 23 окт):
+         бесплатно при партии от 500 изделий или от 100 000 руб; разработка с нуля и партии до 100 шт — платно. */
+      /* ⚠️ «Бесплатно» обещаем ТОЛЬКО там, где тираж заведомо проходит порог в 500 изделий,
+         то есть «больше 1 000». Диапазон «300–1 000» начинается с 300 — он порог не гарантирует,
+         поэтому ему достаётся условная формулировка, а не обещание. */
+      var small = /до 50/.test(tir), free = big;
+      if(small) rows.push('Образец отшиваем платно: партии до 100 изделий считаем отдельно — стоимость назовём на расчёте');
+      else if(free) rows.push('Образец шьём <b>бесплатно</b> — ваш тираж проходит по условию');
+      else rows.push('Образец <b>бесплатно</b> при партии от 500 изделий или от 100 000 ₽, иначе — платно, стоимость назовём на расчёте');
+      if(/со склада|подобрать/i.test(val('fabric_q')) || !val('fabric_q'))
+        rows.push('Ткань со склада в Петербурге: 150–300 артикулов — не ждём поставку');
+      rows.push(big ? 'Срок посчитаем по модели — такие объёмы ведём отдельным графиком'
+                    : 'Партия — <b>2–3 недели</b> после утверждения образца');
+      rows.push('Отгрузка по всей России');
+      box.innerHTML = '<p class="cq__res-h">Что получается по вашим ответам</p><ul>' +
+        rows.map(function(r){ return '<li>' + r + '</li>'; }).join('') +
+        '</ul><p class="cq__res-f">Осталось посчитать цену — пришлём расчёт в течение рабочего дня.</p>';
+      box.hidden = false;
     };
     var to = function(i){
       at = Math.max(0, Math.min(steps.length - 1, i));
